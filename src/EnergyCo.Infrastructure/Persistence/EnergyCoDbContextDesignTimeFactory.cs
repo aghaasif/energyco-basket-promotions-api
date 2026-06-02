@@ -7,8 +7,11 @@ public sealed class EnergyCoDbContextDesignTimeFactory : IDesignTimeDbContextFac
 {
     public EnergyCoDbContext CreateDbContext(string[] args)
     {
+        var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Default")
+            ?? "Data Source=energyco.db";
+
         var options = new DbContextOptionsBuilder<EnergyCoDbContext>()
-            .UseSqlite("Data Source=energyco.db")
+            .UseSqlite(connectionString)
             .Options;
 
         return new EnergyCoDbContext(options);
