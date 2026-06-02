@@ -1,0 +1,32 @@
+## .NET
+bin/
+obj/
+artifacts/
+
+## Test results
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+## User-specific files
+*.user
+*.suo
+*.rsuser
+*.userosscache
+*.sln.docstates
+
+## IDEs
+.vs/
+.vscode/
+.idea/
+
+## Runtime databases
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+## Logs
+*.log
