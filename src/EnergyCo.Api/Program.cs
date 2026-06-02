@@ -1,41 +1,70 @@
+using System.Threading.RateLimiting;
+using Asp.Versioning;
+using EnergyCo.Api;
+using EnergyCo.Api.V1.Endpoints;
+using EnergyCo.Application;
+using EnergyCo.Infrastructure;
+using EnergyCo.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.RateLimiting;
+using Scalar.AspNetCore;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddValidation();
+builder.Services.AddMemoryCache();
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
+
+builder.Services
+    .AddApiVersioning(options =>
+    {
+        options.DefaultApiVersion = new ApiVersion(1, 0);
+        options.AssumeDefaultVersionWhenUnspecified = false;
+        options.ReportApiVersions = true;
+        options.ApiVersionReader = new HeaderApiVersionReader("api-version");
+    });
+
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<EnergyCoDbContext>("sqlite");
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter("basket-promotions", limiter =>
+    {
+        limiter.PermitLimit = builder.Configuration.GetValue("RateLimiting:BasketPromotions:PermitLimit", 60);
+        limiter.Window = TimeSpan.FromSeconds(builder.Configuration.GetValue("RateLimiting:BasketPromotions:WindowSeconds", 60));
+        limiter.QueueLimit = 0;
+        limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+    });
+});
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
+await app.ApplyDatabaseMigrationsAsync();
 
-app.UseHttpsRedirection();
+app.MapOpenApi();
+app.MapScalarApiReference();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+app.UseRateLimiter();
 
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+var versionSet = app.NewApiVersionSet()
+    .HasApiVersion(new ApiVersion(1, 0))
+    .ReportApiVersions()
+    .Build();
+
+app.MapGroup("/api")
+    .WithApiVersionSet(versionSet)
+    .MapBasketPromotionEndpoints();
+
+app.MapHealthChecks(
+    "/health/live",
+    new HealthCheckOptions { Predicate = _ => false });
+
+app.MapHealthChecks("/health/ready");
 
 app.Run();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
+public partial class Program;
