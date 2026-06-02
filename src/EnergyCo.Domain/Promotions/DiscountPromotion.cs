@@ -6,12 +6,12 @@ public sealed class DiscountPromotion
 
     public required string Name { get; init; }
 
-    public DateOnly StartDate { get; init; }
+    public DateTime StartDateUtc { get; init; }
 
-    public DateOnly EndDate { get; init; }
+    public DateTime EndDateUtc { get; init; }
 
     public decimal DiscountPercent { get; init; }
 
-    public bool IsActiveOn(DateOnly transactionDate) =>
-        StartDate <= transactionDate && transactionDate <= EndDate;
+    public bool IsActiveOn(DateTime transactionDateUtc) =>
+        StartDateUtc <= transactionDateUtc && transactionDateUtc < EndDateUtc;
 }

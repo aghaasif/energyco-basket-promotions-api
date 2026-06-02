@@ -22,6 +22,12 @@ public sealed class DiscountPromotionConfiguration : IEntityTypeConfiguration<Di
         builder.Property(promotion => promotion.DiscountPercent)
             .HasColumnType("decimal(5,2)");
 
-        builder.HasIndex(promotion => new { promotion.StartDate, promotion.EndDate });
+        builder.Property(promotion => promotion.StartDateUtc)
+            .IsRequired();
+
+        builder.Property(promotion => promotion.EndDateUtc)
+            .IsRequired();
+
+        builder.HasIndex(promotion => new { promotion.StartDateUtc, promotion.EndDateUtc });
     }
 }

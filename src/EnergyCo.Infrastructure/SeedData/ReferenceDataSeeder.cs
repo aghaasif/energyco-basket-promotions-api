@@ -52,8 +52,8 @@ public static class ReferenceDataSeeder
             {
                 PointsPromotionId = "PP001",
                 Name = "New Year Promo",
-                StartDate = new DateOnly(2020, 1, 1),
-                EndDate = new DateOnly(2020, 1, 30),
+                StartDateUtc = UtcStart(2020, 1, 1),
+                EndDateUtc = UtcExclusiveEnd(2020, 1, 30),
                 Category = null,
                 PointsPerDollar = 2,
                 CalculationBasis = PointsCalculationBasis.PreDiscount
@@ -62,8 +62,8 @@ public static class ReferenceDataSeeder
             {
                 PointsPromotionId = "PP002",
                 Name = "Fuel Promo",
-                StartDate = new DateOnly(2020, 2, 5),
-                EndDate = new DateOnly(2020, 2, 15),
+                StartDateUtc = UtcStart(2020, 2, 5),
+                EndDateUtc = UtcExclusiveEnd(2020, 2, 15),
                 Category = ProductCategory.Fuel,
                 PointsPerDollar = 3,
                 CalculationBasis = PointsCalculationBasis.PreDiscount
@@ -72,8 +72,8 @@ public static class ReferenceDataSeeder
             {
                 PointsPromotionId = "PP003",
                 Name = "Shop Promo",
-                StartDate = new DateOnly(2020, 3, 1),
-                EndDate = new DateOnly(2020, 3, 20),
+                StartDateUtc = UtcStart(2020, 3, 1),
+                EndDateUtc = UtcExclusiveEnd(2020, 3, 20),
                 Category = ProductCategory.Shop,
                 PointsPerDollar = 4,
                 CalculationBasis = PointsCalculationBasis.PreDiscount
@@ -101,16 +101,16 @@ public static class ReferenceDataSeeder
             {
                 DiscountPromotionId = "DP001",
                 Name = "Fuel Discount Promo",
-                StartDate = new DateOnly(2020, 1, 1),
-                EndDate = new DateOnly(2020, 2, 15),
+                StartDateUtc = UtcStart(2020, 1, 1),
+                EndDateUtc = UtcExclusiveEnd(2020, 2, 15),
                 DiscountPercent = 20m
             },
             new DiscountPromotion
             {
                 DiscountPromotionId = "DP002",
                 Name = "Happy Promo",
-                StartDate = new DateOnly(2020, 3, 2),
-                EndDate = new DateOnly(2020, 3, 20),
+                StartDateUtc = UtcStart(2020, 3, 2),
+                EndDateUtc = UtcExclusiveEnd(2020, 3, 20),
                 DiscountPercent = 15m
             }
         };
@@ -148,4 +148,10 @@ public static class ReferenceDataSeeder
             }
         }
     }
+
+    private static DateTime UtcStart(int year, int month, int day) =>
+        new(year, month, day, 0, 0, 0, DateTimeKind.Utc);
+
+    private static DateTime UtcExclusiveEnd(int year, int month, int day) =>
+        UtcStart(year, month, day).AddDays(1);
 }

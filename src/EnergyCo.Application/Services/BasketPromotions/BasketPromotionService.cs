@@ -8,7 +8,8 @@ namespace EnergyCo.Application.Services.BasketPromotions;
 
 public sealed class BasketPromotionService(
     IProductRepository productRepository,
-    IPromotionRepository promotionRepository) : IBasketPromotionService
+    IPointsPromotionRepository pointsPromotionRepository,
+    IDiscountPromotionRepository discountPromotionRepository) : IBasketPromotionService
 {
     private static readonly AppliedDiscount NoDiscount = new(null, null, 0m, 0m, 0m);
 
@@ -28,8 +29,8 @@ public sealed class BasketPromotionService(
         var products = await LoadProductsAsync(basketItems, cancellationToken);
         var totalAmount = BasketPromotionCalculation.RoundMoney(basketItems.Sum(item => item.LineTotal));
 
-        var activeDiscountPromotions = await promotionRepository.GetActiveDiscountPromotionsAsync(
-            command.TransactionDate,
+        var activeDiscountPromotions = await discountPromotionRepository.GetActiveAsync(
+            command.TransactionDateUtc,
             cancellationToken);
 
         var discountOutcome = await CalculateBestDiscountAsync(
@@ -37,8 +38,8 @@ public sealed class BasketPromotionService(
             activeDiscountPromotions,
             cancellationToken);
 
-        var activePointsPromotions = await promotionRepository.GetActivePointsPromotionsAsync(
-            command.TransactionDate,
+        var activePointsPromotions = await pointsPromotionRepository.GetActiveAsync(
+            command.TransactionDateUtc,
             cancellationToken);
 
         var points = CalculateBestPoints(
@@ -52,7 +53,7 @@ public sealed class BasketPromotionService(
         return new BasketPromotionResult(
             command.CustomerId,
             command.LoyaltyCard.Trim(),
-            command.TransactionDate,
+            command.TransactionDateUtc,
             totalAmount,
             discountOutcome.Discount,
             grandTotal,
@@ -135,7 +136,7 @@ public sealed class BasketPromotionService(
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        var productMappings = await promotionRepository.GetDiscountPromotionProductIdsAsync(
+        var productMappings = await discountPromotionRepository.GetEligibleProductIdsAsync(
             promotionIds,
             cancellationToken);
 
@@ -143,7 +144,7 @@ public sealed class BasketPromotionService(
             .Select(promotion => CalculateDiscountCandidate(basketItems, promotion, productMappings))
             .Where(candidate => candidate.Discount.Amount > 0)
             .OrderByDescending(candidate => candidate.Discount.Amount)
-            .ThenBy(candidate => candidate.Promotion!.EndDate)
+            .ThenBy(candidate => candidate.Promotion!.EndDateUtc)
             .ThenBy(candidate => candidate.Promotion!.DiscountPromotionId, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
@@ -207,7 +208,7 @@ public sealed class BasketPromotionService(
         return activePromotions
             .Select(promotion => CalculatePointsCandidate(basketItems, products, promotion, lineDiscounts))
             .OrderByDescending(points => points.Points)
-            .ThenBy(points => activePromotions.Single(promotion => promotion.PointsPromotionId == points.PromotionId).EndDate)
+            .ThenBy(points => activePromotions.Single(promotion => promotion.PointsPromotionId == points.PromotionId).EndDateUtc)
             .ThenBy(points => points.PromotionId, StringComparer.OrdinalIgnoreCase)
             .First();
     }

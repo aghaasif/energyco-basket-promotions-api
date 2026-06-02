@@ -158,13 +158,14 @@ public sealed class BasketPromotionServiceTests
         IReadOnlyDictionary<string, IReadOnlyCollection<string>>? mappings = null) =>
         new(
             new ProductRepositoryStub(products ?? DefaultProducts()),
-            new PromotionRepositoryStub(pointsPromotions ?? [], discountPromotions ?? [], mappings ?? EmptyMappings()));
+            new PointsPromotionRepositoryStub(pointsPromotions ?? []),
+            new DiscountPromotionRepositoryStub(discountPromotions ?? [], mappings ?? EmptyMappings()));
 
     private static BasketPromotionCommand Command(string transactionDate, params BasketPromotionItem[] items) =>
         new(
             Guid.Parse("8e4e8991-aaee-495b-9f24-52d5d0e509c5"),
             "CTX0000001",
-            DateOnly.Parse(transactionDate),
+            DateTime.SpecifyKind(DateTime.Parse(transactionDate), DateTimeKind.Utc),
             items);
 
     private static BasketPromotionItem Item(string productId, decimal unitPrice, int quantity) =>
@@ -188,8 +189,8 @@ public sealed class BasketPromotionServiceTests
         {
             DiscountPromotionId = promotionId,
             Name = promotionId,
-            StartDate = DateOnly.Parse(startDate),
-            EndDate = DateOnly.Parse(endDate),
+            StartDateUtc = DateTime.SpecifyKind(DateTime.Parse(startDate), DateTimeKind.Utc),
+            EndDateUtc = DateTime.SpecifyKind(DateTime.Parse(endDate), DateTimeKind.Utc).AddDays(1),
             DiscountPercent = discountPercent
         };
 
@@ -204,8 +205,8 @@ public sealed class BasketPromotionServiceTests
         {
             PointsPromotionId = promotionId,
             Name = promotionId,
-            StartDate = DateOnly.Parse(startDate),
-            EndDate = DateOnly.Parse(endDate),
+            StartDateUtc = DateTime.SpecifyKind(DateTime.Parse(startDate), DateTimeKind.Utc),
+            EndDateUtc = DateTime.SpecifyKind(DateTime.Parse(endDate), DateTimeKind.Utc).AddDays(1),
             Category = category,
             PointsPerDollar = pointsPerDollar,
             CalculationBasis = basis
@@ -233,24 +234,27 @@ public sealed class BasketPromotionServiceTests
         }
     }
 
-    private sealed class PromotionRepositoryStub(
-        IReadOnlyCollection<PointsPromotion> pointsPromotions,
-        IReadOnlyCollection<DiscountPromotion> discountPromotions,
-        IReadOnlyDictionary<string, IReadOnlyCollection<string>> mappings) : IPromotionRepository
+    private sealed class PointsPromotionRepositoryStub(
+        IReadOnlyCollection<PointsPromotion> pointsPromotions) : IPointsPromotionRepository
     {
-        public Task<IReadOnlyCollection<PointsPromotion>> GetActivePointsPromotionsAsync(
-            DateOnly transactionDate,
+        public Task<IReadOnlyCollection<PointsPromotion>> GetActiveAsync(
+            DateTime transactionDateUtc,
             CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyCollection<PointsPromotion>>(
-                pointsPromotions.Where(promotion => promotion.IsActiveOn(transactionDate)).ToArray());
+                pointsPromotions.Where(promotion => promotion.IsActiveOn(transactionDateUtc)).ToArray());
+    }
 
-        public Task<IReadOnlyCollection<DiscountPromotion>> GetActiveDiscountPromotionsAsync(
-            DateOnly transactionDate,
+    private sealed class DiscountPromotionRepositoryStub(
+        IReadOnlyCollection<DiscountPromotion> discountPromotions,
+        IReadOnlyDictionary<string, IReadOnlyCollection<string>> mappings) : IDiscountPromotionRepository
+    {
+        public Task<IReadOnlyCollection<DiscountPromotion>> GetActiveAsync(
+            DateTime transactionDateUtc,
             CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyCollection<DiscountPromotion>>(
-                discountPromotions.Where(promotion => promotion.IsActiveOn(transactionDate)).ToArray());
+                discountPromotions.Where(promotion => promotion.IsActiveOn(transactionDateUtc)).ToArray());
 
-        public Task<IReadOnlyDictionary<string, IReadOnlyCollection<string>>> GetDiscountPromotionProductIdsAsync(
+        public Task<IReadOnlyDictionary<string, IReadOnlyCollection<string>>> GetEligibleProductIdsAsync(
             IReadOnlyCollection<string> discountPromotionIds,
             CancellationToken cancellationToken)
         {

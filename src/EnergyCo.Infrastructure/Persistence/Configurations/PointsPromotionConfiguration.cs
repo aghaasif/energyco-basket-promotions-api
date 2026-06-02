@@ -28,6 +28,12 @@ public sealed class PointsPromotionConfiguration : IEntityTypeConfiguration<Poin
             .HasMaxLength(20)
             .IsRequired();
 
-        builder.HasIndex(promotion => new { promotion.StartDate, promotion.EndDate, promotion.Category });
+        builder.Property(promotion => promotion.StartDateUtc)
+            .IsRequired();
+
+        builder.Property(promotion => promotion.EndDateUtc)
+            .IsRequired();
+
+        builder.HasIndex(promotion => new { promotion.StartDateUtc, promotion.EndDateUtc, promotion.Category });
     }
 }

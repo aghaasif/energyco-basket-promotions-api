@@ -18,7 +18,8 @@ public static class DependencyInjection
 
         services.AddDbContext<EnergyCoDbContext>(options => options.UseSqlite(connectionString));
         services.AddScoped<IProductRepository, ProductRepository>();
-        services.AddScoped<IPromotionRepository, PromotionRepository>();
+        services.AddScoped<IPointsPromotionRepository, PointsPromotionRepository>();
+        services.AddScoped<IDiscountPromotionRepository, DiscountPromotionRepository>();
 
         return services;
     }

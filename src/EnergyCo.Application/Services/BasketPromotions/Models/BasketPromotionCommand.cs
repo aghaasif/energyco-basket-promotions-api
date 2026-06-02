@@ -3,5 +3,5 @@ namespace EnergyCo.Application.Services.BasketPromotions.Models;
 public sealed record BasketPromotionCommand(
     Guid CustomerId,
     string LoyaltyCard,
-    DateOnly TransactionDate,
+    DateTime TransactionDateUtc,
     IReadOnlyList<BasketPromotionItem> Basket);

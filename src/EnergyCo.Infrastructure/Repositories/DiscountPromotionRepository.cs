@@ -6,36 +6,17 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace EnergyCo.Infrastructure.Repositories;
 
-public sealed class PromotionRepository(
+public sealed class DiscountPromotionRepository(
     EnergyCoDbContext dbContext,
-    IMemoryCache cache) : IPromotionRepository
+    IMemoryCache cache) : IDiscountPromotionRepository
 {
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
 
-    public async Task<IReadOnlyCollection<PointsPromotion>> GetActivePointsPromotionsAsync(
-        DateOnly transactionDate,
+    public async Task<IReadOnlyCollection<DiscountPromotion>> GetActiveAsync(
+        DateTime transactionDateUtc,
         CancellationToken cancellationToken)
     {
-        var cacheKey = $"points-promotions:{transactionDate:yyyyMMdd}";
-
-        return await cache.GetOrCreateAsync(
-            cacheKey,
-            async entry =>
-            {
-                entry.AbsoluteExpirationRelativeToNow = CacheDuration;
-
-                return await dbContext.PointsPromotions
-                    .AsNoTracking()
-                    .Where(promotion => promotion.StartDate <= transactionDate && transactionDate <= promotion.EndDate)
-                    .ToArrayAsync(cancellationToken);
-            }) ?? [];
-    }
-
-    public async Task<IReadOnlyCollection<DiscountPromotion>> GetActiveDiscountPromotionsAsync(
-        DateOnly transactionDate,
-        CancellationToken cancellationToken)
-    {
-        var cacheKey = $"discount-promotions:{transactionDate:yyyyMMdd}";
+        var cacheKey = $"discount-promotions:{transactionDateUtc:yyyyMMddHHmmss}";
 
         return await cache.GetOrCreateAsync(
             cacheKey,
@@ -45,12 +26,12 @@ public sealed class PromotionRepository(
 
                 return await dbContext.DiscountPromotions
                     .AsNoTracking()
-                    .Where(promotion => promotion.StartDate <= transactionDate && transactionDate <= promotion.EndDate)
+                    .Where(promotion => promotion.StartDateUtc <= transactionDateUtc && transactionDateUtc < promotion.EndDateUtc)
                     .ToArrayAsync(cancellationToken);
             }) ?? [];
     }
 
-    public async Task<IReadOnlyDictionary<string, IReadOnlyCollection<string>>> GetDiscountPromotionProductIdsAsync(
+    public async Task<IReadOnlyDictionary<string, IReadOnlyCollection<string>>> GetEligibleProductIdsAsync(
         IReadOnlyCollection<string> discountPromotionIds,
         CancellationToken cancellationToken)
     {

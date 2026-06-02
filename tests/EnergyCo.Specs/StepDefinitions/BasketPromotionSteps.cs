@@ -18,7 +18,7 @@ public sealed class BasketPromotionSteps : IDisposable
         _request = new BasketPromotionRequest(
             Guid.Parse("8e4e8991-aaee-495b-9f24-52d5d0e509c5"),
             "CTX0000001",
-            new DateOnly(2020, 3, 10),
+            new DateTimeOffset(2020, 3, 10, 0, 0, 0, TimeSpan.Zero),
             [
                 new BasketItemRequest("PRD04", 2.30m, 2),
                 new BasketItemRequest("PRD01", 1.20m, 3)

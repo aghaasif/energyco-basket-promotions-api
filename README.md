@@ -72,7 +72,7 @@ Sample request:
 {
   "customerId": "8e4e8991-aaee-495b-9f24-52d5d0e509c5",
   "loyaltyCard": "CTX0000001",
-  "transactionDate": "2020-03-10",
+  "transactionDate": "2020-03-10T00:00:00Z",
   "basket": [
     {
       "productId": "PRD04",
@@ -94,7 +94,7 @@ Sample response:
 {
   "customerId": "8e4e8991-aaee-495b-9f24-52d5d0e509c5",
   "loyaltyCard": "CTX0000001",
-  "transactionDate": "2020-03-10",
+  "transactionDate": "2020-03-10T00:00:00.0000000+00:00",
   "totalAmount": "8.20",
   "discountApplied": "0.69",
   "grandTotal": "7.51",
@@ -128,6 +128,8 @@ GET /openapi/v1.json
 - Duplicate discount-product mappings are de-duplicated.
 - Points are calculated by flooring qualifying spend to whole dollars before multiplying by points per dollar.
 - Money is calculated with `decimal` and rounded to two decimal places.
+- Date/time values are normalized to UTC.
+- Promotion source dates are interpreted as UTC calendar dates. End dates are inclusive in the supplied source data and represented internally as exclusive UTC end instants.
 
 ## Assumptions
 
@@ -137,6 +139,7 @@ GET /openapi/v1.json
 - The duplicate `DP001 -> PRD02` discount-product mapping is treated as a data quality issue.
 - For demonstration, the duplicate mapping is replaced with `DP002 -> PRD04`.
 - Default loyalty points are calculated on the pre-discount amount, with support in the domain model for post-discount calculation.
+- Request date/time values without an explicit timezone offset are treated as UTC.
 - No secrets are required for this sample.
 
 ## Scalability, Reliability, And Performance

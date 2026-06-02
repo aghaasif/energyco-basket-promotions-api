@@ -44,7 +44,7 @@ public static class BasketPromotionEndpoints
         new(
             request.CustomerId,
             request.LoyaltyCard,
-            request.TransactionDate,
+            request.TransactionDate.UtcDateTime,
             request.Basket
                 .Select(item => new BasketPromotionItem(item.ProductId, item.UnitPrice, item.Quantity))
                 .ToArray());
@@ -53,7 +53,7 @@ public static class BasketPromotionEndpoints
         new(
             result.CustomerId,
             result.LoyaltyCard,
-            result.TransactionDate,
+            new DateTimeOffset(DateTime.SpecifyKind(result.TransactionDateUtc, DateTimeKind.Utc)),
             FormatMoney(result.TotalAmount),
             FormatMoney(result.Discount.Amount),
             FormatMoney(result.GrandTotal),

@@ -1,6 +1,7 @@
 using System.Threading.RateLimiting;
 using Asp.Versioning;
 using EnergyCo.Api;
+using EnergyCo.Api.Json;
 using EnergyCo.Api.V1.Endpoints;
 using EnergyCo.Application;
 using EnergyCo.Infrastructure;
@@ -12,6 +13,10 @@ using Scalar.AspNetCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new UtcDateTimeOffsetJsonConverter());
+});
 builder.Services.AddValidation();
 builder.Services.AddMemoryCache();
 builder.Services.AddApplication();

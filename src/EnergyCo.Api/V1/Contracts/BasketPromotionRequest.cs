@@ -11,7 +11,7 @@ public sealed record BasketPromotionRequest(
     string LoyaltyCard,
 
     [property: Required]
-    DateOnly TransactionDate,
+    DateTimeOffset TransactionDate,
 
     [property: Required]
     [property: MinLength(1)]
