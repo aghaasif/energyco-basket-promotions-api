@@ -10,6 +10,7 @@ public sealed class ProductRepository(
     EnergyCoDbContext dbContext,
     IMemoryCache cache) : IProductRepository
 {
+    private const string ProductCatalogueCacheKey = "products:catalogue";
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
 
     public async Task<IReadOnlyCollection<Product>> GetByIdsAsync(
@@ -27,18 +28,24 @@ public sealed class ProductRepository(
             return [];
         }
 
-        var cacheKey = $"products:{string.Join("|", normalizedProductIds)}";
-
-        return await cache.GetOrCreateAsync(
-            cacheKey,
+        var productCatalogue = await cache.GetOrCreateAsync(
+            ProductCatalogueCacheKey,
             async entry =>
             {
                 entry.AbsoluteExpirationRelativeToNow = CacheDuration;
 
-                return await dbContext.Products
+                var products = await dbContext.Products
                     .AsNoTracking()
-                    .Where(product => normalizedProductIds.Contains(product.ProductId))
                     .ToArrayAsync(cancellationToken);
-            }) ?? [];
+
+                return products.ToDictionary(
+                    product => product.ProductId,
+                    StringComparer.OrdinalIgnoreCase);
+            }) ?? new Dictionary<string, Product>(StringComparer.OrdinalIgnoreCase);
+
+        return normalizedProductIds
+            .Where(productCatalogue.ContainsKey)
+            .Select(productId => productCatalogue[productId])
+            .ToArray();
     }
 }
