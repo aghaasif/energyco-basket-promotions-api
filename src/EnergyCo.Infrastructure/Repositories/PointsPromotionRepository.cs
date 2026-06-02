@@ -16,9 +16,11 @@ public sealed class PointsPromotionRepository(
         DateTime transactionDateUtc,
         CancellationToken cancellationToken)
     {
-        var cacheKey = $"points-promotions:{transactionDateUtc:yyyyMMddHHmmss}";
+        var utcDayStart = transactionDateUtc.Date;
+        var utcDayEnd = utcDayStart.AddDays(1);
+        var cacheKey = $"points-promotions:{utcDayStart:yyyyMMdd}";
 
-        return await cache.GetOrCreateAsync(
+        var dayPromotions = await cache.GetOrCreateAsync(
             cacheKey,
             async entry =>
             {
@@ -26,8 +28,12 @@ public sealed class PointsPromotionRepository(
 
                 return await dbContext.PointsPromotions
                     .AsNoTracking()
-                    .Where(promotion => promotion.StartDateUtc <= transactionDateUtc && transactionDateUtc < promotion.EndDateUtc)
+                    .Where(promotion => promotion.StartDateUtc < utcDayEnd && utcDayStart < promotion.EndDateUtc)
                     .ToArrayAsync(cancellationToken);
             }) ?? [];
+
+        return dayPromotions
+            .Where(promotion => promotion.IsActiveOn(transactionDateUtc))
+            .ToArray();
     }
 }

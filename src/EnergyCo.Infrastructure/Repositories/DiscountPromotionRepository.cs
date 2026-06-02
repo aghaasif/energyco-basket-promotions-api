@@ -1,5 +1,4 @@
 using EnergyCo.Application.Interfaces;
-using EnergyCo.Domain.Promotions;
 using EnergyCo.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -12,62 +11,60 @@ public sealed class DiscountPromotionRepository(
 {
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
 
-    public async Task<IReadOnlyCollection<DiscountPromotion>> GetActiveAsync(
+    public async Task<IReadOnlyCollection<ProductDiscountPromotion>> GetBestActiveProductDiscountsAsync(
         DateTime transactionDateUtc,
         CancellationToken cancellationToken)
     {
-        var cacheKey = $"discount-promotions:{transactionDateUtc:yyyyMMddHHmmss}";
+        var utcDayStart = transactionDateUtc.Date;
+        var utcDayEnd = utcDayStart.AddDays(1);
+        var cacheKey = $"discount-promotions:products:{utcDayStart:yyyyMMdd}";
 
-        return await cache.GetOrCreateAsync(
+        var dayDiscounts = await cache.GetOrCreateAsync(
             cacheKey,
             async entry =>
             {
                 entry.AbsoluteExpirationRelativeToNow = CacheDuration;
 
-                return await dbContext.DiscountPromotions
-                    .AsNoTracking()
-                    .Where(promotion => promotion.StartDateUtc <= transactionDateUtc && transactionDateUtc < promotion.EndDateUtc)
+                var rows = await (
+                    from promotion in dbContext.DiscountPromotions.AsNoTracking()
+                    join mapping in dbContext.DiscountPromotionProducts.AsNoTracking()
+                        on promotion.DiscountPromotionId equals mapping.DiscountPromotionId
+                    where promotion.StartDateUtc < utcDayEnd && utcDayStart < promotion.EndDateUtc
+                    select new ProductDiscountPromotionRow(
+                        mapping.ProductId,
+                        promotion.DiscountPromotionId,
+                        promotion.Name,
+                        promotion.DiscountPercent,
+                        promotion.StartDateUtc,
+                        promotion.EndDateUtc))
                     .ToArrayAsync(cancellationToken);
+
+                return rows
+                    .GroupBy(row => row.ProductId, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group
+                        .OrderByDescending(row => row.DiscountPercent)
+                        .ThenBy(row => row.EndDateUtc)
+                        .ThenBy(row => row.DiscountPromotionId, StringComparer.OrdinalIgnoreCase)
+                        .First())
+                    .ToArray();
             }) ?? [];
-    }
 
-    public async Task<IReadOnlyDictionary<string, IReadOnlyCollection<string>>> GetEligibleProductIdsAsync(
-        IReadOnlyCollection<string> discountPromotionIds,
-        CancellationToken cancellationToken)
-    {
-        var normalizedPromotionIds = discountPromotionIds
-            .Select(promotionId => promotionId.Trim().ToUpperInvariant())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Order(StringComparer.OrdinalIgnoreCase)
+        return dayDiscounts
+            .Where(discount => discount.StartDateUtc <= transactionDateUtc && transactionDateUtc < discount.EndDateUtc)
+            .Select(discount => new ProductDiscountPromotion(
+                discount.ProductId,
+                discount.DiscountPromotionId,
+                discount.PromotionName,
+                discount.DiscountPercent,
+                discount.EndDateUtc))
             .ToArray();
-
-        if (normalizedPromotionIds.Length == 0)
-        {
-            return new Dictionary<string, IReadOnlyCollection<string>>(StringComparer.OrdinalIgnoreCase);
-        }
-
-        var cacheKey = $"discount-promotion-products:{string.Join("|", normalizedPromotionIds)}";
-
-        return await cache.GetOrCreateAsync(
-            cacheKey,
-            async entry =>
-            {
-                entry.AbsoluteExpirationRelativeToNow = CacheDuration;
-
-                var mappings = await dbContext.DiscountPromotionProducts
-                    .AsNoTracking()
-                    .Where(mapping => normalizedPromotionIds.Contains(mapping.DiscountPromotionId))
-                    .ToArrayAsync(cancellationToken);
-
-                return mappings
-                    .GroupBy(mapping => mapping.DiscountPromotionId, StringComparer.OrdinalIgnoreCase)
-                    .ToDictionary(
-                        group => group.Key,
-                        group => (IReadOnlyCollection<string>)group
-                            .Select(mapping => mapping.ProductId)
-                            .Distinct(StringComparer.OrdinalIgnoreCase)
-                            .ToArray(),
-                        StringComparer.OrdinalIgnoreCase);
-            }) ?? new Dictionary<string, IReadOnlyCollection<string>>(StringComparer.OrdinalIgnoreCase);
     }
+
+    private sealed record ProductDiscountPromotionRow(
+        string ProductId,
+        string DiscountPromotionId,
+        string PromotionName,
+        decimal DiscountPercent,
+        DateTime StartDateUtc,
+        DateTime EndDateUtc);
 }

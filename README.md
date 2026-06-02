@@ -120,9 +120,11 @@ GET /openapi/v1.json
 - Basket line totals use the request `unitPrice` and `quantity`.
 - Product catalogue data is used for product existence, category, and promotion eligibility.
 - Promotion date ranges are inclusive.
-- If multiple discount promotions are eligible, the API chooses the one that gives the customer the highest discount.
+- Discount promotions are applied per eligible product.
+- If multiple active discount promotions apply to the same product, the API chooses the promotion that gives the highest product-level discount.
+- Discounts for different products in the same basket may come from different promotions.
 - If multiple points promotions are eligible, the API chooses the one that gives the customer the highest points.
-- Discount promotions do not stack with other discount promotions.
+- Discount promotions do not stack on the same product.
 - Points promotions do not stack with other points promotions.
 - One discount promotion and one points promotion can apply to the same basket.
 - Duplicate discount-product mappings are de-duplicated.

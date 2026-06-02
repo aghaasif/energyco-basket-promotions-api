@@ -102,6 +102,29 @@ public sealed class BasketPromotionServiceTests
     }
 
     [Fact]
+    public async Task CalculateAsync_applies_best_discount_per_product()
+    {
+        var service = CreateService(
+            discountPromotions:
+            [
+                DiscountPromotion("DP001", "2020-01-01", "2020-02-15", 20m),
+                DiscountPromotion("DP002", "2020-01-01", "2020-02-15", 30m)
+            ],
+            mappings: new Dictionary<string, IReadOnlyCollection<string>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["DP001"] = ["PRD01", "PRD02"],
+                ["DP002"] = ["PRD01"]
+            });
+
+        var result = await service.CalculateAsync(
+            Command("2020-01-15", Item("PRD01", 10.00m, 1), Item("PRD02", 10.00m, 1)),
+            CancellationToken.None);
+
+        Assert.Equal(5.00m, result.Discount.Amount);
+        Assert.Equal(15.00m, result.GrandTotal);
+    }
+
+    [Fact]
     public async Task CalculateAsync_selects_best_points_for_customer()
     {
         var service = CreateService(pointsPromotions:
@@ -248,22 +271,34 @@ public sealed class BasketPromotionServiceTests
         IReadOnlyCollection<DiscountPromotion> discountPromotions,
         IReadOnlyDictionary<string, IReadOnlyCollection<string>> mappings) : IDiscountPromotionRepository
     {
-        public Task<IReadOnlyCollection<DiscountPromotion>> GetActiveAsync(
+        public Task<IReadOnlyCollection<ProductDiscountPromotion>> GetBestActiveProductDiscountsAsync(
             DateTime transactionDateUtc,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyCollection<DiscountPromotion>>(
-                discountPromotions.Where(promotion => promotion.IsActiveOn(transactionDateUtc)).ToArray());
-
-        public Task<IReadOnlyDictionary<string, IReadOnlyCollection<string>>> GetEligibleProductIdsAsync(
-            IReadOnlyCollection<string> discountPromotionIds,
             CancellationToken cancellationToken)
         {
-            var requested = discountPromotionIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
-            IReadOnlyDictionary<string, IReadOnlyCollection<string>> filtered = mappings
-                .Where(mapping => requested.Contains(mapping.Key))
-                .ToDictionary(mapping => mapping.Key, mapping => mapping.Value, StringComparer.OrdinalIgnoreCase);
+            var discounts = discountPromotions
+                .Where(promotion => promotion.IsActiveOn(transactionDateUtc))
+                .SelectMany(promotion =>
+                {
+                    var productIds = mappings.TryGetValue(promotion.DiscountPromotionId, out var mappedProductIds)
+                        ? mappedProductIds
+                        : Array.Empty<string>();
 
-            return Task.FromResult(filtered);
+                    return productIds.Select(productId => new ProductDiscountPromotion(
+                        productId,
+                        promotion.DiscountPromotionId,
+                        promotion.Name,
+                        promotion.DiscountPercent,
+                        promotion.EndDateUtc));
+                })
+                .GroupBy(discount => discount.ProductId, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group
+                    .OrderByDescending(discount => discount.DiscountPercent)
+                    .ThenBy(discount => discount.EndDateUtc)
+                    .ThenBy(discount => discount.DiscountPromotionId, StringComparer.OrdinalIgnoreCase)
+                    .First())
+                .ToArray();
+
+            return Task.FromResult<IReadOnlyCollection<ProductDiscountPromotion>>(discounts);
         }
     }
 }

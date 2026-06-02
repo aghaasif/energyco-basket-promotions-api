@@ -29,14 +29,13 @@ public sealed class BasketPromotionService(
         var products = await LoadProductsAsync(basketItems, cancellationToken);
         var totalAmount = BasketPromotionCalculation.RoundMoney(basketItems.Sum(item => item.LineTotal));
 
-        var activeDiscountPromotions = await discountPromotionRepository.GetActiveAsync(
+        var activeProductDiscounts = await discountPromotionRepository.GetBestActiveProductDiscountsAsync(
             command.TransactionDateUtc,
             cancellationToken);
 
-        var discountOutcome = await CalculateBestDiscountAsync(
+        var discountOutcome = CalculateProductDiscounts(
             basketItems,
-            activeDiscountPromotions,
-            cancellationToken);
+            activeProductDiscounts);
 
         var activePointsPromotions = await pointsPromotionRepository.GetActiveAsync(
             command.TransactionDateUtc,
@@ -121,61 +120,33 @@ public sealed class BasketPromotionService(
         return productMap;
     }
 
-    private async Task<DiscountOutcome> CalculateBestDiscountAsync(
+    private static DiscountOutcome CalculateProductDiscounts(
         IReadOnlyCollection<BasketItem> basketItems,
-        IReadOnlyCollection<DiscountPromotion> activePromotions,
-        CancellationToken cancellationToken)
+        IReadOnlyCollection<ProductDiscountPromotion> activeProductDiscounts)
     {
-        if (activePromotions.Count == 0)
+        if (activeProductDiscounts.Count == 0)
         {
             return new DiscountOutcome(NoDiscount, EmptyLineDiscounts(basketItems));
         }
 
-        var promotionIds = activePromotions
-            .Select(promotion => promotion.DiscountPromotionId)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        var productMappings = await discountPromotionRepository.GetEligibleProductIdsAsync(
-            promotionIds,
-            cancellationToken);
-
-        var candidates = activePromotions
-            .Select(promotion => CalculateDiscountCandidate(basketItems, promotion, productMappings))
-            .Where(candidate => candidate.Discount.Amount > 0)
-            .OrderByDescending(candidate => candidate.Discount.Amount)
-            .ThenBy(candidate => candidate.Promotion!.EndDateUtc)
-            .ThenBy(candidate => candidate.Promotion!.DiscountPromotionId, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        return candidates.FirstOrDefault() ?? new DiscountOutcome(NoDiscount, EmptyLineDiscounts(basketItems));
-    }
-
-    private static DiscountOutcome CalculateDiscountCandidate(
-        IReadOnlyCollection<BasketItem> basketItems,
-        DiscountPromotion promotion,
-        IReadOnlyDictionary<string, IReadOnlyCollection<string>> productMappings)
-    {
-        if (!productMappings.TryGetValue(promotion.DiscountPromotionId, out var eligibleProductIds) ||
-            eligibleProductIds.Count == 0)
-        {
-            return new DiscountOutcome(NoDiscount, EmptyLineDiscounts(basketItems), promotion);
-        }
-
-        var eligibleProducts = eligibleProductIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var discountByProductId = activeProductDiscounts.ToDictionary(
+            discount => discount.ProductId,
+            StringComparer.OrdinalIgnoreCase);
         var lineDiscounts = new List<decimal>(basketItems.Count);
         var eligibleAmount = 0m;
         var discountAmount = 0m;
+        var appliedPromotions = new Dictionary<string, ProductDiscountPromotion>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var item in basketItems)
         {
             var lineDiscount = 0m;
 
-            if (eligibleProducts.Contains(item.ProductId))
+            if (discountByProductId.TryGetValue(item.ProductId, out var discount))
             {
                 eligibleAmount += item.LineTotal;
-                lineDiscount = BasketPromotionCalculation.RoundMoney(item.LineTotal * promotion.DiscountPercent / 100m);
+                lineDiscount = BasketPromotionCalculation.RoundMoney(item.LineTotal * discount.DiscountPercent / 100m);
                 discountAmount += lineDiscount;
+                appliedPromotions.TryAdd(discount.DiscountPromotionId, discount);
             }
 
             lineDiscounts.Add(lineDiscount);
@@ -185,14 +156,30 @@ public sealed class BasketPromotionService(
 
         return new DiscountOutcome(
             new AppliedDiscount(
-                promotion.DiscountPromotionId,
-                promotion.Name,
-                promotion.DiscountPercent,
+                AppliedPromotionId(appliedPromotions.Values),
+                AppliedPromotionName(appliedPromotions.Values),
+                AppliedDiscountPercent(appliedPromotions.Values),
                 BasketPromotionCalculation.RoundMoney(eligibleAmount),
                 discountAmount),
-            lineDiscounts,
-            promotion);
+            lineDiscounts);
     }
+
+    private static string? AppliedPromotionId(IReadOnlyCollection<ProductDiscountPromotion> promotions) =>
+        promotions.Count == 0
+            ? null
+            : promotions.Count == 1
+                ? promotions.First().DiscountPromotionId
+                : "Multiple";
+
+    private static string? AppliedPromotionName(IReadOnlyCollection<ProductDiscountPromotion> promotions) =>
+        promotions.Count == 0
+            ? null
+            : promotions.Count == 1
+                ? promotions.First().PromotionName
+                : "Multiple promotions";
+
+    private static decimal AppliedDiscountPercent(IReadOnlyCollection<ProductDiscountPromotion> promotions) =>
+        promotions.Count == 1 ? promotions.First().DiscountPercent : 0m;
 
     private static EarnedPoints CalculateBestPoints(
         IReadOnlyList<BasketItem> basketItems,
@@ -258,6 +245,5 @@ public sealed class BasketPromotionService(
 
     private sealed record DiscountOutcome(
         AppliedDiscount Discount,
-        IReadOnlyList<decimal> LineDiscounts,
-        DiscountPromotion? Promotion = null);
+        IReadOnlyList<decimal> LineDiscounts);
 }
