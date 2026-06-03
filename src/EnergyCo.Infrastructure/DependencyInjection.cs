@@ -9,12 +9,14 @@ namespace EnergyCo.Infrastructure;
 
 public static class DependencyInjection
 {
+    private const string DefaultSqliteConnectionString = "Data Source=energyco.db";
+
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("Default")
-            ?? "Data Source=energyco.db";
+            ?? DefaultSqliteConnectionString;
 
         services.AddDbContext<EnergyCoDbContext>(options => options.UseSqlite(connectionString));
         services.AddScoped<IProductRepository, ProductRepository>();

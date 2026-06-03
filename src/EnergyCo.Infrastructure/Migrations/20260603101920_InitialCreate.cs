@@ -29,8 +29,8 @@ namespace EnergyCo.Infrastructure.Migrations
                 {
                     DiscountPromotionId = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
                     Name = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
-                    StartDate = table.Column<DateOnly>(type: "TEXT", nullable: false),
-                    EndDate = table.Column<DateOnly>(type: "TEXT", nullable: false),
+                    StartDateUtc = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    EndDateUtc = table.Column<DateTime>(type: "TEXT", nullable: false),
                     DiscountPercent = table.Column<decimal>(type: "decimal(5,2)", nullable: false)
                 },
                 constraints: table =>
@@ -44,8 +44,8 @@ namespace EnergyCo.Infrastructure.Migrations
                 {
                     PointsPromotionId = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
                     Name = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
-                    StartDate = table.Column<DateOnly>(type: "TEXT", nullable: false),
-                    EndDate = table.Column<DateOnly>(type: "TEXT", nullable: false),
+                    StartDateUtc = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    EndDateUtc = table.Column<DateTime>(type: "TEXT", nullable: false),
                     Category = table.Column<string>(type: "TEXT", maxLength: 20, nullable: true),
                     PointsPerDollar = table.Column<int>(type: "INTEGER", nullable: false),
                     CalculationBasis = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false)
@@ -75,14 +75,14 @@ namespace EnergyCo.Infrastructure.Migrations
                 column: "ProductId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_DiscountPromotions_StartDate_EndDate",
+                name: "IX_DiscountPromotions_StartDateUtc_EndDateUtc",
                 table: "DiscountPromotions",
-                columns: new[] { "StartDate", "EndDate" });
+                columns: new[] { "StartDateUtc", "EndDateUtc" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_PointsPromotions_StartDate_EndDate_Category",
+                name: "IX_PointsPromotions_StartDateUtc_EndDateUtc_Category",
                 table: "PointsPromotions",
-                columns: new[] { "StartDate", "EndDate", "Category" });
+                columns: new[] { "StartDateUtc", "EndDateUtc", "Category" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Products_Category",

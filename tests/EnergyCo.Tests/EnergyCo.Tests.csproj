@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\EnergyCo.Application\EnergyCo.Application.csproj" />
     <ProjectReference Include="..\..\src\EnergyCo.Domain\EnergyCo.Domain.csproj" />
+    <ProjectReference Include="..\..\src\EnergyCo.Infrastructure\EnergyCo.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EnergyCo.Infrastructure.Migrations
 {
     [DbContext(typeof(EnergyCoDbContext))]
-    [Migration("20260602124555_UseUtcDateTimePromotions")]
-    partial class UseUtcDateTimePromotions
+    [Migration("20260603101920_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

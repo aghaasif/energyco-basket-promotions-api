@@ -6,13 +6,12 @@ A .NET 10 backend API for calculating basket discounts and loyalty points from c
 
 - .NET 10 LTS
 - ASP.NET Core Minimal APIs
-- Header-based API versioning
-- Scalar API reference UI
+- Scalar API UI based on OpenApi specs
 - SQLite with EF Core migrations
-- In-memory caching for reference data
+- In-memory caching for selective reference data
 - xUnit unit tests
 - Reqnroll BDD integration test
-- Single Docker container
+- Single Docker container for isolated runs
 
 ## Run With Docker
 
@@ -98,7 +97,7 @@ Sample response:
   "totalAmount": "8.20",
   "discountApplied": "0.69",
   "grandTotal": "7.51",
-  "pointsEarned": "16"
+  "pointsEarned": "15"
 }
 ```
 
@@ -117,57 +116,35 @@ GET /openapi/v1.json
 
 ## Calculation Rules
 
-- Basket line totals use the request `unitPrice` and `quantity`.
-- Product catalogue data is used for product existence, category, and promotion eligibility.
-- Promotion date ranges are inclusive.
-- Discount promotions are applied per eligible product.
+- Basket line totals use the request `unitPrice` and `quantity` instead of UnitPrice in Products table
 - If multiple active discount promotions apply to the same product, the API chooses the promotion that gives the highest product-level discount.
-- Discounts for different products in the same basket may come from different promotions.
-- If multiple points promotions are eligible, the API chooses the one that gives the customer the highest points.
-- Discount promotions do not stack on the same product.
-- Points promotions do not stack with other points promotions.
-- One discount promotion and one points promotion can apply to the same basket.
-- Duplicate discount-product mappings are de-duplicated.
-- Points are calculated by flooring qualifying spend to whole dollars before multiplying by points per dollar.
-- Money is calculated with `decimal` and rounded to two decimal places.
-- Date/time values are normalized to UTC.
-- Promotion source dates are interpreted as UTC calendar dates. End dates are inclusive in the supplied source data and represented internally as exclusive UTC end instants.
+- Points promotions are evaluated per basket line.
+- If multiple points promotions are eligible for the same basket line, the API chooses the promotion that gives the customer the highest points for that line.
+- Since the points are currently calculated per basket line, qualifying spend is floored to whole dollars at line level before multiplying by points per dollar. This can award fewer points than grouping lines by winning points promotion and flooring the grouped qualifying spend once.
+- A base points promotion runs indefinitely and awards 1 point per whole dollar when no better points promotion applies.
+- Date/time values are normalized to UTC and Promotion source dates are interpreted as UTC calendar dates.
 
 ## Assumptions
 
 - Authentication and authorisation are out of scope.
-- `customerId` is read from the payload only. In production, identity would come from trusted authentication claims.
-- The supplied sample response appears inconsistent with the supplied basket, prices, and promotion dates, so this implementation calculates from the rules and reference data.
 - The duplicate `DP001 -> PRD02` discount-product mapping is treated as a data quality issue.
 - For demonstration, the duplicate mapping is replaced with `DP002 -> PRD04`.
-- Default loyalty points are calculated on the pre-discount amount, with support in the domain model for post-discount calculation.
+- Default loyalty points are calculated on post-discount amounts. Points promotions can be configured to calculate from either pre-discount or post-discount amounts on per promotion basis in the database table.
 - Request date/time values without an explicit timezone offset are treated as UTC.
-- No secrets are required for this sample.
 
 ## Scalability, Reliability, And Performance
 
-- The API, application logic, domain rules, and persistence are separated into distinct projects.
+- The API, application logic, domain rules, and persistence are separated into distinct projects following Clean Architecture.
 - EF Core queries use `AsNoTracking()` for read-only reference data.
 - Basket products are loaded in one batched query by distinct product IDs.
-- Active promotions are queried by transaction date.
+- Active promotions are queried by transaction date and cached.
 - Product IDs, promotion date ranges, and promotion-product mappings are indexed.
-- Reference data is cached with `IMemoryCache` to reduce repeated SQLite reads.
-- Basket-specific quote responses are not cached.
+- Active points/discount promotion reference data is cached with `IMemoryCache` to reduce repeated SQLite reads.
 - Request validation and business validation return structured problem responses.
 - Basic fixed-window rate limiting is applied to the basket promotion calculation endpoint.
+- Health check endpoints added to expose lightweight liveness and readiness probes.
+- Database connection retries were considered for reliability but not implemented as of now.
 
-In a larger deployment, the same application boundary could use a server database such as SQL Server or PostgreSQL. Hot read paths could move to read replicas, a distributed cache such as Redis, or compiled EF queries after profiling shows a need.
+## Disclaimer
 
-## Production Migration Notes
-
-Startup migrations are used here to make the project easy to run during review. In production, migrations should run as a separate deployment step or job before API rollout.
-
-For breaking schema changes, prefer an expand/contract approach:
-
-- add compatible schema first
-- backfill data separately
-- deploy application changes
-- verify behaviour in production-like environments
-- remove old schema only after callers have moved
-
-Riskier releases should include backups, migration-duration monitoring, post-deployment validation, and rollback-forward planning.
+AI assistance was used during this project to help refine parts of the code, tests and documentation. All design decisions, business logic, code organisation, performance and scalability elements were planned and executed independently.

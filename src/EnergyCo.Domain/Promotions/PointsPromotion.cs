@@ -16,7 +16,7 @@ public sealed class PointsPromotion
 
     public int PointsPerDollar { get; init; }
 
-    public PointsCalculationBasis CalculationBasis { get; init; } = PointsCalculationBasis.PreDiscount;
+    public PointsCalculationBasis CalculationBasis { get; init; } = PointsCalculationBasis.PostDiscount;
 
     public bool IsActiveOn(DateTime transactionDateUtc) =>
         StartDateUtc <= transactionDateUtc && transactionDateUtc < EndDateUtc;

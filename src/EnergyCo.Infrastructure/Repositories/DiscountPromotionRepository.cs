@@ -11,6 +11,14 @@ public sealed class DiscountPromotionRepository(
 {
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
 
+    /// <summary>
+    /// Gets the best active product discount promotions for the given transaction date. 
+    /// If multiple promotions are active for a product, the one with the highest discount percent is returned. 
+    /// Promotions are cached by day to optimize performance for transactions occurring on the same day.
+    /// </summary>
+    /// <param name="transactionDateUtc">Transaction date (UTC)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>A collection of the best active product discount promotions for the given transaction date.</returns>
     public async Task<IReadOnlyCollection<ProductDiscountPromotion>> GetBestActiveProductDiscountsAsync(
         DateTime transactionDateUtc,
         CancellationToken cancellationToken)
@@ -19,13 +27,14 @@ public sealed class DiscountPromotionRepository(
         var utcDayEnd = utcDayStart.AddDays(1);
         var cacheKey = $"discount-promotions:products:{utcDayStart:yyyyMMdd}";
 
-        var dayDiscounts = await cache.GetOrCreateAsync(
+        // Cache the discount promotions for the day to avoid hitting the database multiple times for transactions on the same day.
+        var dayDiscountCandidates = await cache.GetOrCreateAsync(
             cacheKey,
             async entry =>
             {
                 entry.AbsoluteExpirationRelativeToNow = CacheDuration;
 
-                var rows = await (
+                return await (
                     from promotion in dbContext.DiscountPromotions.AsNoTracking()
                     join mapping in dbContext.DiscountPromotionProducts.AsNoTracking()
                         on promotion.DiscountPromotionId equals mapping.DiscountPromotionId
@@ -38,19 +47,18 @@ public sealed class DiscountPromotionRepository(
                         promotion.StartDateUtc,
                         promotion.EndDateUtc))
                     .ToArrayAsync(cancellationToken);
-
-                return rows
-                    .GroupBy(row => row.ProductId, StringComparer.OrdinalIgnoreCase)
-                    .Select(group => group
-                        .OrderByDescending(row => row.DiscountPercent)
-                        .ThenBy(row => row.EndDateUtc)
-                        .ThenBy(row => row.DiscountPromotionId, StringComparer.OrdinalIgnoreCase)
-                        .First())
-                    .ToArray();
             }) ?? [];
 
-        return dayDiscounts
+
+        // Filter the cached promotions to those active at the transaction time, then select the promotion that
+        // gives the maximum discount for each product.
+        return dayDiscountCandidates
             .Where(discount => discount.StartDateUtc <= transactionDateUtc && transactionDateUtc < discount.EndDateUtc)
+            .GroupBy(discount => discount.ProductId, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(discount => discount.DiscountPercent)
+                .ThenBy(discount => discount.DiscountPromotionId, StringComparer.OrdinalIgnoreCase)
+                .First())
             .Select(discount => new ProductDiscountPromotion(
                 discount.ProductId,
                 discount.DiscountPromotionId,

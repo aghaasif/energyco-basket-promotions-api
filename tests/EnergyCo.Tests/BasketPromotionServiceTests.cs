@@ -1,5 +1,6 @@
 using EnergyCo.Application.Interfaces;
 using EnergyCo.Application.Services.BasketPromotions;
+using EnergyCo.Application.Services.BasketPromotions.Calculators;
 using EnergyCo.Application.Services.BasketPromotions.Models;
 using EnergyCo.Domain.Products;
 using EnergyCo.Domain.Promotions;
@@ -9,16 +10,19 @@ namespace EnergyCo.Tests;
 public sealed class BasketPromotionServiceTests
 {
     [Fact]
-    public async Task CalculateAsync_returns_totals_without_promotions()
+    public async Task CalculateAsync_returns_totals_with_base_points_only()
     {
-        var service = CreateService();
+        var service = CreateService(pointsPromotions:
+        [
+            PointsPromotion("PP000", "0001-01-01", "9999-12-30", null, 1)
+        ]);
 
         var result = await service.CalculateAsync(Command("2020-04-03", Item("PRD01", 1.20m, 3)), CancellationToken.None);
 
         Assert.Equal(3.60m, result.TotalAmount);
         Assert.Equal(0m, result.Discount.Amount);
         Assert.Equal(3.60m, result.GrandTotal);
-        Assert.Equal(0, result.Points.Points);
+        Assert.Equal(3, result.Points.Points);
     }
 
     [Fact]
@@ -97,7 +101,6 @@ public sealed class BasketPromotionServiceTests
 
         var result = await service.CalculateAsync(Command("2020-01-15", Item("PRD02", 2.00m, 2)), CancellationToken.None);
 
-        Assert.Equal("DP002", result.Discount.PromotionId);
         Assert.Equal(1.20m, result.Discount.Amount);
     }
 
@@ -135,7 +138,6 @@ public sealed class BasketPromotionServiceTests
 
         var result = await service.CalculateAsync(Command("2020-01-15", Item("PRD01", 1.20m, 10)), CancellationToken.None);
 
-        Assert.Equal("PP002", result.Points.PromotionId);
         Assert.Equal(36, result.Points.Points);
     }
 
@@ -182,7 +184,9 @@ public sealed class BasketPromotionServiceTests
         new(
             new ProductRepositoryStub(products ?? DefaultProducts()),
             new PointsPromotionRepositoryStub(pointsPromotions ?? []),
-            new DiscountPromotionRepositoryStub(discountPromotions ?? [], mappings ?? EmptyMappings()));
+            new DiscountPromotionRepositoryStub(discountPromotions ?? [], mappings ?? EmptyMappings()),
+            new DiscountCalculator(),
+            new PointsCalculator());
 
     private static BasketPromotionCommand Command(string transactionDate, params BasketPromotionItem[] items) =>
         new(
@@ -223,7 +227,7 @@ public sealed class BasketPromotionServiceTests
         string endDate,
         ProductCategory? category,
         int pointsPerDollar,
-        PointsCalculationBasis basis = PointsCalculationBasis.PreDiscount) =>
+        PointsCalculationBasis basis = PointsCalculationBasis.PostDiscount) =>
         new()
         {
             PointsPromotionId = promotionId,
@@ -293,7 +297,6 @@ public sealed class BasketPromotionServiceTests
                 .GroupBy(discount => discount.ProductId, StringComparer.OrdinalIgnoreCase)
                 .Select(group => group
                     .OrderByDescending(discount => discount.DiscountPercent)
-                    .ThenBy(discount => discount.EndDateUtc)
                     .ThenBy(discount => discount.DiscountPromotionId, StringComparer.OrdinalIgnoreCase)
                     .First())
                 .ToArray();

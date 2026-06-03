@@ -50,13 +50,23 @@ public static class ReferenceDataSeeder
         {
             new PointsPromotion
             {
+                PointsPromotionId = "PP000",
+                Name = "Base Points",
+                StartDateUtc = DateTime.MinValue,
+                EndDateUtc = DateTime.MaxValue,
+                Category = null,
+                PointsPerDollar = 1,
+                CalculationBasis = PointsCalculationBasis.PostDiscount
+            },
+            new PointsPromotion
+            {
                 PointsPromotionId = "PP001",
                 Name = "New Year Promo",
                 StartDateUtc = UtcStart(2020, 1, 1),
                 EndDateUtc = UtcExclusiveEnd(2020, 1, 30),
                 Category = null,
                 PointsPerDollar = 2,
-                CalculationBasis = PointsCalculationBasis.PreDiscount
+                CalculationBasis = PointsCalculationBasis.PostDiscount
             },
             new PointsPromotion
             {
@@ -66,7 +76,7 @@ public static class ReferenceDataSeeder
                 EndDateUtc = UtcExclusiveEnd(2020, 2, 15),
                 Category = ProductCategory.Fuel,
                 PointsPerDollar = 3,
-                CalculationBasis = PointsCalculationBasis.PreDiscount
+                CalculationBasis = PointsCalculationBasis.PostDiscount
             },
             new PointsPromotion
             {
@@ -76,7 +86,7 @@ public static class ReferenceDataSeeder
                 EndDateUtc = UtcExclusiveEnd(2020, 3, 20),
                 Category = ProductCategory.Shop,
                 PointsPerDollar = 4,
-                CalculationBasis = PointsCalculationBasis.PreDiscount
+                CalculationBasis = PointsCalculationBasis.PostDiscount
             }
         };
 

@@ -49,7 +49,7 @@ public sealed class BasketPromotionSteps : IDisposable
         Assert.Equal("8.20", _response.TotalAmount);
         Assert.Equal("0.69", _response.DiscountApplied);
         Assert.Equal("7.51", _response.GrandTotal);
-        Assert.Equal("16", _response.PointsEarned);
+        Assert.Equal("15", _response.PointsEarned);
     }
 
     public void Dispose()
